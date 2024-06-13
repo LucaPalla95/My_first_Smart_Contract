@@ -2,7 +2,7 @@ use cosmwasm_schema::{cw_serde, QueryResponses};
 
 #[cw_serde]
 pub struct InstantiateMsg {
-    pub count: i32,
+    pub deposit: i32,
 }
 
 #[cw_serde]

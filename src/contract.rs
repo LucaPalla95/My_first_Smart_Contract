@@ -7,7 +7,7 @@ use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, GetCountResponse, InstantiateMsg, QueryMsg};
 use crate::state::{State, STATE};
 
-// version info for migration info
+// version info for migration info hh
 const CONTRACT_NAME: &str = "crates.io:my_first_contract";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -19,7 +19,7 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     let state = State {
-        count: msg.count,
+        deposit: msg.deposit,
         owner: info.sender.clone(),
     };
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
@@ -61,7 +61,7 @@ pub mod execute {
             if info.sender != state.owner {
                 return Err(ContractError::Unauthorized {});
             }
-            state.count = count;
+            state.deposit = deposit;
             Ok(state)
         })?;
         Ok(Response::new().add_attribute("action", "reset"))
