@@ -1,13 +1,13 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::Addr;
-use cw_storage_plus::Item;
+use cosmwasm_std::{Addr, Uint128};
+use cw_storage_plus::{Item, Map};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct State {
-    pub deposit: i32,
-    pub owner: Addr,
+    pub tot_deposit: Uint128,
 }
 
 pub const STATE: Item<State> = Item::new("state");
+pub const BALANCES: Map<Addr, Uint128> = Map::new("balances");
