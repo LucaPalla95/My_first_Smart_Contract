@@ -9,7 +9,7 @@ pub struct InstantiateMsg {
 #[cw_serde]
 pub enum ExecuteMsg {
     burn {amount: Uint128},
-    transfer {from: String, to: String},
+    transfer {from: String, to: String, amount: Uint128},
 }
 
 #[cw_serde]
