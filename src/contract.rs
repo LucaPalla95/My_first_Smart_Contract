@@ -1,6 +1,6 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+use cosmwasm_std::{to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Addr, Uint128};
 use cw2::set_contract_version;
 
 use crate::error::ContractError;
@@ -43,6 +43,8 @@ pub fn execute(
 }
 
 pub mod execute {
+    use crate::state::BALANCES;
+
     use super::*;
 
     pub fn burn_initial_deposit(
@@ -63,8 +65,15 @@ pub mod execute {
         to: Addr,
         amount: Uint128,
     ) -> Result<Response, ContractError> {
-        STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
-            let receiver = deps.api.addr_validate(&to)?;
+        let balances 
+        BALANCES.update(deps.storage, |mut amount| -> Result<_, ContractError> {
+            let sender = deps.api.addr_validate(&from.to_string())?;
+            let receiver = deps.api.addr_validate(&to.to_string())?;
+            if amount > 0 {
+                balances.
+            }
+
+            BALANCES.update(deps.storage, , action)
             state.deposit = deposit;
             Ok(state)
         })?;

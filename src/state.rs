@@ -5,9 +5,9 @@ use cosmwasm_std::{Addr, Uint128};
 use cw_storage_plus::{Item, Map};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-pub struct State {
-    pub tot_deposit: Uint128,
+pub struct Config {
+    pub allowed_denom: String,
 }
 
-pub const STATE: Item<State> = Item::new("state");
+pub const CONFIG: Item<Config> = Item::new("state");
 pub const BALANCES: Map<Addr, Uint128> = Map::new("balances");
