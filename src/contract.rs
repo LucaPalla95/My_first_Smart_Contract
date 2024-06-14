@@ -59,14 +59,12 @@ pub mod execute {
 
     pub fn transfer_fund(
         deps: DepsMut,
-        from: String, 
-        to: String,
+        from: Addr, 
+        to: Addr,
         amount: Uint128,
     ) -> Result<Response, ContractError> {
         STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
-            if info.sender != state.owner {
-                return Err(ContractError::Unauthorized {});
-            }
+            let receiver = deps.api.addr_validate(&to)?;
             state.deposit = deposit;
             Ok(state)
         })?;
