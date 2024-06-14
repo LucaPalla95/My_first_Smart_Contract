@@ -8,8 +8,9 @@ pub struct InstantiateMsg {
 
 #[cw_serde]
 pub enum ExecuteMsg {
-    burn {amount: Uint128},
-    transfer {from: Addr, to: Addr, amount: Uint128},
+    deposit {}, //We could insert the amount to check if it is consistent with the fund sent to the bank module of the blockchain
+    transfer {amount: Uint128, receiver: Addr},
+    withdraw {amount: Uint128, receiver: Addr},
 }
 
 #[cw_serde]
@@ -22,7 +23,18 @@ pub enum QueryMsg {
 
 // We define a custom struct for each query response
 #[cw_serde]
-pub struct GetCountResponse {
+pub struct GetDepositResponse {
     pub Address: Addr,
-    pub balance: Uint128,
+    pub deposit: Uint128,
+}
+#[cw_serde]
+pub struct GetTransferResponse {
+    pub sender: Addr,
+    pub amount: Uint128,
+    pub receiver: Addr,
+}
+#[cw_serde]
+pub struct GetDepositResponse {
+    pub Address: Addr,
+    pub deposit: Uint128,
 }
