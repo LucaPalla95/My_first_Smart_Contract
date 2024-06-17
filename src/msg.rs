@@ -1,5 +1,5 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Uint128};
+use cosmwasm_std::{Addr, Coin, Uint128};
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -10,7 +10,7 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     deposit {}, //We could insert the amount to check if it is consistent with the fund sent to the bank module of the blockchain
     transfer {amount: Uint128, receiver: Addr},
-    withdraw {amount: Uint128},
+    withdraw {token: Coin},
 }
 
 #[cw_serde]

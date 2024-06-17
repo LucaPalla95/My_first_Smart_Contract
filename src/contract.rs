@@ -40,12 +40,12 @@ pub fn execute(
     match msg {
         ExecuteMsg::deposit {} => execute::deposit_fund(deps, info),
         ExecuteMsg::transfer {amount, receiver } => execute::transfer_fund(deps, info, amount, receiver),
-        ExecuteMsg::withdraw {amount } => execute::withdraw_fund(deps, info, amount),
+        ExecuteMsg::withdraw {token } => execute::withdraw_fund(deps, info, token),
     }
 }
 
 pub mod execute {
-    use cosmwasm_std::BankMsg;
+    use cosmwasm_std::{BankMsg, Coin};
 
     use crate::state::BALANCES;
 
@@ -127,19 +127,47 @@ pub mod execute {
     pub fn withdraw_fund(
         deps: DepsMut,
         info: MessageInfo, 
-        amount: Uint128,
+        token: Coin,
     ) -> Result<Response, ContractError> {
 
-        let receiver = deps.api.addr_validate(&receiver)?;
+        // check no funds are sent
+        if !info.funds.is_empty() {
+            return Err(ContractError::Unauthorized {});
+        }
 
         // Upload confuguration and balance
         let config = CONFIG.load(deps.storage)?;
-        let balance_sender: Uint128 = BALANCES.may_load(deps.storage, &info.sender)?
-        ;
-        Ok(Response::new().add_attribute("action", "reset").add_message(BankMsg::Send{ 
-            amount: amount,
+
+        // Find the amount of allowed_denom sent with the transaction
+        if token.denom != config.allowed_denom {
+            return Err(ContractError::Unauthorized {});
+        }
+
+        // Find the amount of allowed_denom sent with the transaction
+        if token.amount.is_zero() {
+            return Err(ContractError::Unauthorized {});
+        }
+
+        let receiver = info.sender.clone();
+        
+        // Update balance if sufficient amount was deposited.
+        BALANCES.update(deps.storage, info.sender.clone(), |balance: Option<Uint128>| {
+            if let Some(balance_sender) = balance{
+                if balance_sender >= token.amount {
+                    Ok::<Uint128,ContractError>(balance_sender - token.amount)
+                } else {
+                    Err(ContractError::Unauthorized {  })
+                }
+            } else {
+                Err(ContractError::Unauthorized {  })
+            }
+        })?;
+        let vec_token: Vec<Coin> = vec![token.clone()];
+        Ok(Response::new().add_attribute("action", "withdraw").add_message(BankMsg::Send{ 
+            amount: vec_token, 
             to_address: receiver.to_string(),
-        }))
+        }).add_attribute("amount", token.amount)
+        .add_attribute("receiver", receiver))
     }
 }
 
@@ -148,7 +176,6 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::GetCount {} => to_json_binary(&query::count(deps)?),
     }
-}
 
 pub mod query {
     use super::*;
