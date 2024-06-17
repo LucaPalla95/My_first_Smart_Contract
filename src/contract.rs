@@ -2,10 +2,11 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Addr, Uint128};
 use cw2::set_contract_version;
+use cw_storage_plus::{Item, Map};
 
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, GetCountResponse, InstantiateMsg, QueryMsg};
-use crate::state::{State, STATE};
+use crate::msg::{ExecuteMsg, GetDepositResponse, InstantiateMsg, QueryMsg};
+use crate::state::{CONFIG, Config, BALANCES};
 
 // version info for migration info hh
 const CONTRACT_NAME: &str = "crates.io:my_first_contract";
@@ -14,70 +15,131 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
-    _env: Env,
+    _env: Env, 
     _info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
-    let state = State {
-        tot_deposit: msg.tot_deposit,
+    let config = Config {
+        allowed_denom: msg.allowed_denom,
     };
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    STATE.save(deps.storage, &state)?;
+    CONFIG.save(deps.storage, &config)?;
 
     Ok(Response::new()
         .add_attribute("method", "instantiate")
-        .add_attribute("total deposit", msg.tot_deposit.to_string()))
+        .add_attribute("allowed denom", &config.allowed_denom))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
     _env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::burn {amount} => execute::burn_initial_deposit(deps, amount),
-        ExecuteMsg::transfer {from, to, amount } => execute::transfer_fund(deps, from, to, amount),
+        ExecuteMsg::deposit {} => execute::deposit_fund(deps, info),
+        ExecuteMsg::transfer {amount, receiver } => execute::transfer_fund(deps, info, amount, receiver),
+        ExecuteMsg::withdraw {amount } => execute::withdraw_fund(deps, info, amount),
     }
 }
 
 pub mod execute {
+    use cosmwasm_std::BankMsg;
+
     use crate::state::BALANCES;
 
     use super::*;
 
-    pub fn burn_initial_deposit(
+    pub fn deposit_fund(
         deps: DepsMut, 
-        amount: Uint128,
+        info: MessageInfo,
     ) -> Result<Response, ContractError> {
-        STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
-            state.tot_deposit -= amount;
-            Ok(state)
+        let config = CONFIG.load(deps.storage)?;
+    
+        // Find the amount of allowed_denom sent with the transaction
+        let amount = info
+            .funds // funds sent
+            .iter() // iterate over coins sent
+            // TODO: Check if the && is correct
+            .find(|c| c.denom == config.allowed_denom) // search for the coin which is allowed by the contract
+            .map(|c| c.amount) // get the amount
+            .unwrap_or_else(Uint128::zero); // if not found return 0
+    
+        if amount.is_zero() {
+            //TODO: Change the error message
+            return Err(ContractError::Unauthorized {});
+        }
+    
+        let depositor = info.sender;
+        BALANCES.update(deps.storage, depositor.clone(), |balance: Option<Uint128>| {
+            Ok::<Uint128,ContractError>(balance.unwrap_or_else(Uint128::zero) + amount)
         })?;
-
-        Ok(Response::new().add_attribute("action", "increment"))
+    
+        Ok(Response::new()
+            .add_attribute("action", "deposit_funds")
+            .add_attribute("depositor", depositor)
+            .add_attribute("amount", amount))
     }
 
     pub fn transfer_fund(
         deps: DepsMut,
-        from: Addr, 
-        to: Addr,
+        info: MessageInfo, 
+        amount: Uint128,
+        receiver: Addr,
+    ) -> Result<Response, ContractError> {
+
+        // check no funds are sent
+        if !info.funds.is_empty() {
+            return Err(ContractError::Unauthorized {});
+        }
+
+        let receiver = deps.api.addr_validate(&receiver.to_string())?;
+
+        if amount.is_zero() {
+            return Err(ContractError::Unauthorized {});
+        }
+
+        // check if deposits are sufficient
+        BALANCES.update(deps.storage, info.sender.clone(), |balance: Option<Uint128>| {
+            if let Some(balance_sender) = balance{
+                if balance_sender >= amount {
+                    Ok::<Uint128,ContractError>(balance_sender - amount)
+                } else {
+                    Err(ContractError::Unauthorized {  })
+                }
+            } else {
+                Err(ContractError::Unauthorized {  })
+            }
+        })?;
+        // TODO: Check if the error above block also this update
+        BALANCES.update(deps.storage, receiver.clone(), |balance: Option<Uint128>| {
+            Ok::<Uint128,ContractError>(balance.unwrap_or_else(Uint128::zero) + amount)
+        })?;
+
+        Ok(Response::new()
+        .add_attribute("action", "trasfer_fund")
+        .add_attribute("sender", info.sender)
+        .add_attribute("receiver", receiver)
+        .add_attribute("amount", amount.to_string()))
+    }
+
+    pub fn withdraw_fund(
+        deps: DepsMut,
+        info: MessageInfo, 
         amount: Uint128,
     ) -> Result<Response, ContractError> {
-        let balances 
-        BALANCES.update(deps.storage, |mut amount| -> Result<_, ContractError> {
-            let sender = deps.api.addr_validate(&from.to_string())?;
-            let receiver = deps.api.addr_validate(&to.to_string())?;
-            if amount > 0 {
-                balances.
-            }
 
-            BALANCES.update(deps.storage, , action)
-            state.deposit = deposit;
-            Ok(state)
-        })?;
-        Ok(Response::new().add_attribute("action", "reset"))
+        let receiver = deps.api.addr_validate(&receiver)?;
+
+        // Upload confuguration and balance
+        let config = CONFIG.load(deps.storage)?;
+        let balance_sender: Uint128 = BALANCES.may_load(deps.storage, &info.sender)?
+        ;
+        Ok(Response::new().add_attribute("action", "reset").add_message(BankMsg::Send{ 
+            amount: amount,
+            to_address: receiver.to_string(),
+        }))
     }
 }
 

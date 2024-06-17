@@ -3,14 +3,14 @@ use cosmwasm_std::{Addr, Uint128};
 
 #[cw_serde]
 pub struct InstantiateMsg {
-    pub tot_deposit: Uint128,
+    pub allowed_denom: String,
 }
 
 #[cw_serde]
 pub enum ExecuteMsg {
     deposit {}, //We could insert the amount to check if it is consistent with the fund sent to the bank module of the blockchain
     transfer {amount: Uint128, receiver: Addr},
-    withdraw {amount: Uint128, receiver: Addr},
+    withdraw {amount: Uint128},
 }
 
 #[cw_serde]
