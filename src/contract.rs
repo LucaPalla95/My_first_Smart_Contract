@@ -40,7 +40,7 @@ pub fn execute(
     match msg {
         ExecuteMsg::deposit {} => execute::deposit_fund(deps, info),
         ExecuteMsg::transfer {amount, receiver } => execute::transfer_fund(deps, info, amount, receiver),
-        ExecuteMsg::withdraw {token } => execute::withdraw_fund(deps, info, token),
+        ExecuteMsg::withdraw {amount } => execute::withdraw_fund(deps, info, amount),
     }
 }
 
@@ -127,7 +127,7 @@ pub mod execute {
     pub fn withdraw_fund(
         deps: DepsMut,
         info: MessageInfo, 
-        token: Coin,
+        amount: Uint128,
     ) -> Result<Response, ContractError> {
 
         // check no funds are sent
@@ -139,12 +139,7 @@ pub mod execute {
         let config = CONFIG.load(deps.storage)?;
 
         // Find the amount of allowed_denom sent with the transaction
-        if token.denom != config.allowed_denom {
-            return Err(ContractError::Unauthorized {});
-        }
-
-        // Find the amount of allowed_denom sent with the transaction
-        if token.amount.is_zero() {
+        if amount.is_zero() {
             return Err(ContractError::Unauthorized {});
         }
 
@@ -153,8 +148,8 @@ pub mod execute {
         // Update balance if sufficient amount was deposited.
         BALANCES.update(deps.storage, info.sender.clone(), |balance: Option<Uint128>| {
             if let Some(balance_sender) = balance{
-                if balance_sender >= token.amount {
-                    Ok::<Uint128,ContractError>(balance_sender - token.amount)
+                if balance_sender >= amount {
+                    Ok::<Uint128,ContractError>(balance_sender - amount)
                 } else {
                     Err(ContractError::Unauthorized {  })
                 }
@@ -162,27 +157,32 @@ pub mod execute {
                 Err(ContractError::Unauthorized {  })
             }
         })?;
-        let vec_token: Vec<Coin> = vec![token.clone()];
         Ok(Response::new().add_attribute("action", "withdraw").add_message(BankMsg::Send{ 
-            amount: vec_token, 
+            amount: vec![Coin::new(amount, config.allowed_denom.clone())], 
             to_address: receiver.to_string(),
-        }).add_attribute("amount", token.amount)
+        }).add_attribute("amount", amount)
         .add_attribute("receiver", receiver))
     }
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(
+    deps: Deps,
+    _env: Env, 
+    msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetCount {} => to_json_binary(&query::count(deps)?),
+        QueryMsg::GetDeposit {owner} => to_json_binary(&query::deposit(deps, owner)?),
+        }
     }
 
 pub mod query {
     use super::*;
 
-    pub fn count(deps: Deps) -> StdResult<GetCountResponse> {
-        let state = STATE.load(deps.storage)?;
-        Ok(GetCountResponse { count: state.count })
+    pub fn deposit(
+        deps: Deps, 
+        owner: Addr) -> StdResult<GetDepositResponse> {
+        let balance = BALANCES.load(deps.storage, owner.clone())?;
+        Ok(GetDepositResponse {address: owner, deposit: balance })
     }
 }
 
