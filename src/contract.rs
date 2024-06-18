@@ -2,10 +2,8 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Addr, Uint128};
 use cw2::set_contract_version;
-use cw_storage_plus::{Item, Map};
-
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, GetDepositResponse, InstantiateMsg, QueryMsg};
+use crate::msg::{ExecuteMsg, GetDepositResponse, InstantiateMsg, QueryMsg, GetAllDepositResponse};
 use crate::state::{CONFIG, Config, BALANCES};
 
 // version info for migration info hh
@@ -172,10 +170,14 @@ pub fn query(
     msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::GetDeposit {owner} => to_json_binary(&query::deposit(deps, owner)?),
+        QueryMsg::GetAllDeposit {} => to_json_binary(&query::alldeposit(deps)?),
         }
     }
 
 pub mod query {
+
+    use cosmwasm_std::Order;
+
     use super::*;
 
     pub fn deposit(
@@ -183,6 +185,23 @@ pub mod query {
         owner: Addr) -> StdResult<GetDepositResponse> {
         let balance = BALANCES.load(deps.storage, owner.clone())?;
         Ok(GetDepositResponse {address: owner, deposit: balance })
+    }
+
+    pub fn alldeposit(deps: Deps) -> StdResult<Vec<GetAllDepositResponse>> {
+        // 
+        let balances = BALANCES.range(deps.storage, None, None, Order::Ascending);
+    
+        let response = balances
+            .map(|item| {
+                let (address, balance) = item?;
+                Ok(GetAllDepositResponse {
+                    address: address,
+                    totaldeposit: balance,
+                })
+            })
+            .collect::<StdResult<Vec<_>>>()?;
+    
+        Ok(response)
     }
 }
 

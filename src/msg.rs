@@ -19,6 +19,8 @@ pub enum QueryMsg {
     // GetCount returns the current count as a json-encoded number
     #[returns(GetDepositResponse)]
     GetDeposit {owner: Addr},
+    #[returns(GetAllDepositResponse)]
+    GetAllDeposit {},
 }
 
 // We define a custom struct for each query response
@@ -27,3 +29,14 @@ pub struct GetDepositResponse {
     pub address: Addr,
     pub deposit: Uint128,
 }
+#[cw_serde]
+pub struct GetAllDepositResponse {
+    pub address: Addr,
+    pub totaldeposit: Uint128,
+}
+
+#[cw_serde]
+pub struct GetTotalDepositResponse {
+    pub totaldeposit: Uint128,
+}
+
