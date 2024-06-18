@@ -65,8 +65,7 @@ pub mod execute {
             .unwrap_or_else(Uint128::zero); // if not found return 0
     
         if amount.is_zero() {
-            //TODO: Change the error message
-            return Err(ContractError::Unauthorized {});
+            return Err(ContractError::InvalidDepositAmount{});
         }
     
         let depositor = info.sender;
@@ -89,13 +88,13 @@ pub mod execute {
 
         // check no funds are sent
         if !info.funds.is_empty() {
-            return Err(ContractError::Unauthorized {});
+            return Err(ContractError::EmptyFunds {});
         }
 
         let receiver = deps.api.addr_validate(&receiver.to_string())?;
 
         if amount.is_zero() {
-            return Err(ContractError::Unauthorized {});
+            return Err(ContractError::InvalidDepositAmount {});
         }
 
         // check if deposits are sufficient
@@ -104,10 +103,10 @@ pub mod execute {
                 if balance_sender >= amount {
                     Ok::<Uint128,ContractError>(balance_sender - amount)
                 } else {
-                    Err(ContractError::Unauthorized {  })
+                    Err(ContractError::TransferFundsExceedsBalance {  })
                 }
             } else {
-                Err(ContractError::Unauthorized {  })
+                Err(ContractError::AddressHasNotDeposit {  })
             }
         })?;
         // TODO: Check if the error above block also this update
@@ -130,7 +129,7 @@ pub mod execute {
 
         // check no funds are sent
         if !info.funds.is_empty() {
-            return Err(ContractError::Unauthorized {});
+            return Err(ContractError::EmptyFunds {});
         }
 
         // Upload confuguration and balance
@@ -138,7 +137,7 @@ pub mod execute {
 
         // Find the amount of allowed_denom sent with the transaction
         if amount.is_zero() {
-            return Err(ContractError::Unauthorized {});
+            return Err(ContractError::InvalidDepositAmount {});
         }
 
         let receiver = info.sender.clone();
@@ -149,10 +148,10 @@ pub mod execute {
                 if balance_sender >= amount {
                     Ok::<Uint128,ContractError>(balance_sender - amount)
                 } else {
-                    Err(ContractError::Unauthorized {  })
+                    Err(ContractError::WithdrawFundsExceedsBalance {  })
                 }
             } else {
-                Err(ContractError::Unauthorized {  })
+                Err(ContractError::AddressHasNotDeposit {  })
             }
         })?;
         Ok(Response::new().add_attribute("action", "withdraw").add_message(BankMsg::Send{ 
@@ -170,7 +169,7 @@ pub fn query(
     msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::GetDeposit {owner} => to_json_binary(&query::deposit(deps, owner)?),
-        QueryMsg::GetAllDeposit {} => to_json_binary(&query::alldeposit(deps)?),
+        QueryMsg::GetAllDeposit {} => to_json_binary(&query::all_deposits(deps)?),
         }
     }
 
@@ -187,9 +186,9 @@ pub mod query {
         Ok(GetDepositResponse {address: owner, deposit: balance })
     }
 
-    pub fn alldeposit(deps: Deps) -> StdResult<Vec<GetAllDepositResponse>> {
+    pub fn all_deposits(deps: Deps) -> StdResult<Vec<GetAllDepositResponse>> {
         // 
-        let balances = BALANCES.range(deps.storage, None, None, Order::Ascending);
+        let balances = BALANCES.range(deps.storage, None, None, Order::Ascending); // LOAD MEGLIO
     
         let response = balances
             .map(|item| {
@@ -203,89 +202,84 @@ pub mod query {
     
         Ok(response)
     }
+
     pub fn totaldeposit(deps: Deps) -> StdResult<GetTotalDepositResponse> {
         // Iterazione sui bilanci in ordine ascendente
         let balances = BALANCES.range(deps.storage, None, None, Order::Ascending);
     
         // Calcolo del totale dei depositi con gestione degli errori
         let total_deposit = balances
-            .try_fold(Uint128::zero(), |acc, item| {
-                let (_, balance) = item?;
-                Ok(acc + balance)
-            })?;
+            .fold(Uint128::zero(), |acc, item| {
+                let (_, balance) = item.expect("Item should be there");
+                acc + balance
+            });
     
         Ok(GetTotalDepositResponse { totaldeposit: total_deposit })
     }
     
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-//     use cosmwasm_std::{coins, from_json};
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use cosmwasm_std::testing::{message_info, mock_dependencies, mock_env};
+    use cosmwasm_std::{coins, from_json};
 
-    // #[test]
-    // fn proper_initialization() {
-    //     let mut deps = mock_dependencies();
+    #[test]
+    fn proper_initialization() {
+        let mut deps = mock_dependencies();
+        let msg = InstantiateMsg { allowed_denom: "TSU".to_string() };
+        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglennn9"), &coins(1000, "earth"));
 
-    //     let msg = InstantiateMsg { count: 17 };
-    //     let info = mock_info("creator", &coins(1000, "earth"));
+        // we can just call .unwrap() to assert this was a success
+        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        assert_eq!(0, res.messages.len());
+    }
 
-    //     // we can just call .unwrap() to assert this was a success
-    //     let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
-    //     assert_eq!(0, res.messages.len());
+    #[test]
+    fn increment() {
+        let mut deps = mock_dependencies();
 
-    //     // it worked, let's query the state
-    //     let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-    //     let value: GetCountResponse = from_json(&res).unwrap();
-    //     assert_eq!(17, value.count);
-    // }
+        let msg = InstantiateMsg { count: 17 };
+        let info = mock_info("creator", &coins(2, "token"));
+        let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-//     #[test]
-//     fn increment() {
-//         let mut deps = mock_dependencies();
+        // beneficiary can release it
+        let info = mock_info("anyone", &coins(2, "token"));
+        let msg = ExecuteMsg::Increment {};
+        let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-//         let msg = InstantiateMsg { count: 17 };
-//         let info = mock_info("creator", &coins(2, "token"));
-//         let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        // should increase counter by 1
+        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+        let value: GetCountResponse = from_json(&res).unwrap();
+        assert_eq!(18, value.count);
+    }
 
-//         // beneficiary can release it
-//         let info = mock_info("anyone", &coins(2, "token"));
-//         let msg = ExecuteMsg::Increment {};
-//         let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+    #[test]
+    fn reset() {
+        let mut deps = mock_dependencies();
 
-//         // should increase counter by 1
-//         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-//         let value: GetCountResponse = from_json(&res).unwrap();
-//         assert_eq!(18, value.count);
-//     }
+        let msg = InstantiateMsg { count: 17 };
+        let info = mock_info("creator", &coins(2, "token"));
+        let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-//     #[test]
-//     fn reset() {
-//         let mut deps = mock_dependencies();
+        // beneficiary can release it
+        let unauth_info = mock_info("anyone", &coins(2, "token"));
+        let msg = ExecuteMsg::Reset { count: 5 };
+        let res = execute(deps.as_mut(), mock_env(), unauth_info, msg);
+        match res {
+            Err(ContractError::Unauthorized {}) => {}
+            _ => panic!("Must return unauthorized error"),
+        }
 
-//         let msg = InstantiateMsg { count: 17 };
-//         let info = mock_info("creator", &coins(2, "token"));
-//         let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        // only the original creator can reset the counter
+        let auth_info = mock_info("creator", &coins(2, "token"));
+        let msg = ExecuteMsg::Reset { count: 5 };
+        let _res = execute(deps.as_mut(), mock_env(), auth_info, msg).unwrap();
 
-//         // beneficiary can release it
-//         let unauth_info = mock_info("anyone", &coins(2, "token"));
-//         let msg = ExecuteMsg::Reset { count: 5 };
-//         let res = execute(deps.as_mut(), mock_env(), unauth_info, msg);
-//         match res {
-//             Err(ContractError::Unauthorized {}) => {}
-//             _ => panic!("Must return unauthorized error"),
-//         }
-
-//         // only the original creator can reset the counter
-//         let auth_info = mock_info("creator", &coins(2, "token"));
-//         let msg = ExecuteMsg::Reset { count: 5 };
-//         let _res = execute(deps.as_mut(), mock_env(), auth_info, msg).unwrap();
-
-//         // should now be 5
-//         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-//         let value: GetCountResponse = from_json(&res).unwrap();
-//         assert_eq!(5, value.count);
-//     }
-// }
+        // should now be 5
+        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+        let value: GetCountResponse = from_json(&res).unwrap();
+        assert_eq!(5, value.count);
+    }
+}

@@ -8,6 +8,19 @@ pub enum ContractError {
 
     #[error("Unauthorized")]
     Unauthorized {},
-    // Add any other custom errors you like here.
-    // Look at https://docs.rs/thiserror/1.0.21/thiserror/ for details.
+
+    #[error("Amount deposit must be greater than 0")]
+    InvalidDepositAmount(),
+
+    #[error("Funds field should not be empty")]
+    EmptyFunds(),
+
+    #[error("Balance is lower than amount to transfer")]
+    TransferFundsExceedsBalance(),
+
+    #[error("The address selected does not have a deposit")]
+    AddressHasNotDeposit(),
+
+    #[error("Balance is lower than amount to withdraw")]
+    WithdrawFundsExceedsBalance(),
 }
