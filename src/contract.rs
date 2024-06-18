@@ -3,7 +3,7 @@ use cosmwasm_std::entry_point;
 use cosmwasm_std::{to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Addr, Uint128};
 use cw2::set_contract_version;
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, GetDepositResponse, InstantiateMsg, QueryMsg, GetAllDepositResponse};
+use crate::msg::{ExecuteMsg, GetDepositResponse, InstantiateMsg, QueryMsg, GetAllDepositResponse, GetTotalDepositResponse};
 use crate::state::{CONFIG, Config, BALANCES};
 
 // version info for migration info hh
@@ -203,6 +203,20 @@ pub mod query {
     
         Ok(response)
     }
+    pub fn totaldeposit(deps: Deps) -> StdResult<GetTotalDepositResponse> {
+        // Iterazione sui bilanci in ordine ascendente
+        let balances = BALANCES.range(deps.storage, None, None, Order::Ascending);
+    
+        // Calcolo del totale dei depositi con gestione degli errori
+        let total_deposit = balances
+            .try_fold(Uint128::zero(), |acc, item| {
+                let (_, balance) = item?;
+                Ok(acc + balance)
+            })?;
+    
+        Ok(GetTotalDepositResponse { totaldeposit: total_deposit })
+    }
+    
 }
 
 // #[cfg(test)]
