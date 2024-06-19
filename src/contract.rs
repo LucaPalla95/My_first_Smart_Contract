@@ -231,7 +231,7 @@ pub mod query {
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{message_info, mock_dependencies, mock_env};
-    use cosmwasm_std::{coins, from_json, Coin};
+    use cosmwasm_std::{coins, from_json};
 
 
     // Istantiate
@@ -277,38 +277,22 @@ mod tests {
         // assert_eq!(events[0].attributes[0].value, "cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0");
         // assert_eq!(events[0].attributes[1].key, "amount");
         // assert_eq!(events[0].attributes[1].value, "2tsy");
-
-        // should increase counter by 1
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-        let value: GetCountResponse = from_json(&res).unwrap();
-        assert_eq!(18, value.count);
     }
 
+    // Test deposit error
     #[test]
-    fn reset() {
+    fn test_deposit_error() {
         let mut deps = mock_dependencies();
-
-        let msg = InstantiateMsg { count: 17 };
-        let info = mock_info("creator", &coins(2, "token"));
+        let msg = InstantiateMsg { allowed_denom: "tsy".to_string() };
+        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(1000, "tsy"));
         let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-        // beneficiary can release it
-        let unauth_info = mock_info("anyone", &coins(2, "token"));
-        let msg = ExecuteMsg::Reset { count: 5 };
-        let res = execute(deps.as_mut(), mock_env(), unauth_info, msg);
+        let msg = ExecuteMsg::deposit{};
+        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(0, "tsy"));
+        let res = execute(deps.as_mut(), mock_env(), info, msg);
         match res {
-            Err(ContractError::Unauthorized {}) => {}
-            _ => panic!("Must return unauthorized error"),
+            Err(ContractError::InvalidDepositAmount {}) => {}
+            _ => panic!("Must return Invalid Deposit Amount error"),
         }
-
-        // only the original creator can reset the counter
-        let auth_info = mock_info("creator", &coins(2, "token"));
-        let msg = ExecuteMsg::Reset { count: 5 };
-        let _res = execute(deps.as_mut(), mock_env(), auth_info, msg).unwrap();
-
-        // should now be 5
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-        let value: GetCountResponse = from_json(&res).unwrap();
-        assert_eq!(5, value.count);
     }
 }
