@@ -36,9 +36,9 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::deposit {} => execute::deposit_fund(deps, info),
-        ExecuteMsg::transfer {amount, receiver } => execute::transfer_fund(deps, info, amount, receiver),
-        ExecuteMsg::withdraw {amount } => execute::withdraw_fund(deps, info, amount),
+        ExecuteMsg::Deposit {} => execute::deposit_fund(deps, info),
+        ExecuteMsg::Transfer {amount, receiver } => execute::transfer_fund(deps, info, amount, receiver),
+        ExecuteMsg::Withdraw {amount } => execute::withdraw_fund(deps, info, amount),
     }
 }
 
@@ -94,7 +94,7 @@ pub mod execute {
         let receiver = deps.api.addr_validate(&receiver.to_string())?;
 
         if amount.is_zero() {
-            return Err(ContractError::InvalidDepositAmount {});
+            return Err(ContractError::InvalidTransferAmount{});
         }
 
         // check if deposits are sufficient
@@ -168,7 +168,7 @@ pub fn query(
     _env: Env, 
     msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetState {  } => to_json_binary(&query::state(deps)?),
+        QueryMsg::GetState {} => to_json_binary(&query::state(deps)?),
         QueryMsg::GetDeposit {owner} => to_json_binary(&query::deposit(deps, owner)?),
         QueryMsg::GetAllDeposit {} => to_json_binary(&query::all_deposits(deps)?),
         QueryMsg::GetTotalDeposit {} => to_json_binary(&query::totaldeposit(deps)?),
@@ -239,7 +239,7 @@ mod tests {
     fn proper_initialization() {
         let mut deps = mock_dependencies();
         let msg = InstantiateMsg { allowed_denom: "tsy".to_string() };
-        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(1000, "tsy"));
+        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &[]);
 
         // we can just call .unwrap() to assert this was a success
         let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -256,10 +256,10 @@ mod tests {
     fn test_deposit_successfully() {
         let mut deps = mock_dependencies();
         let msg = InstantiateMsg { allowed_denom: "tsy".to_string() };
-        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(1000, "tsy"));
+        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(1000, "tsy".to_string()));
         let _res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
 
-        let msg = ExecuteMsg::deposit{};
+        let msg = ExecuteMsg::Deposit{};
         let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(res.messages.len(), 0);
 
@@ -278,31 +278,31 @@ mod tests {
         // assert_eq!(events[0].attributes[1].value, "2tsy");
     }
 
-    // Test deposit error
+    // Test deposit error 0
     #[test]
     fn test_deposit_0_deposit_error() {
         let mut deps = mock_dependencies();
         let msg = InstantiateMsg { allowed_denom: "tsy".to_string() };
-        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(1000, "tsy"));
+        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(1000, "tsy".to_string()));
         let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-        let msg = ExecuteMsg::deposit{};
-        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(0, "tsy"));
+        let msg = ExecuteMsg::Deposit{};
+        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(0, "tsy".to_string()));
         let res = execute(deps.as_mut(), mock_env(), info, msg);
         match res {
             Err(ContractError::InvalidDepositAmount {}) => {}
             _ => panic!("Must return Invalid Deposit Amount error"),
         }
     }
-
+    // Test deposit error 0 parte 2
     #[test]
     fn test_deposit_0_deposit_error_2() {
         let mut deps = mock_dependencies();
         let msg = InstantiateMsg { allowed_denom: "tsy".to_string() };
-        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(1000, "thi"));
+        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(1000, "thi".to_string()));
         let _res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
 
-        let msg = ExecuteMsg::deposit{};
+        let msg = ExecuteMsg::Deposit{};
         let res = execute(deps.as_mut(), mock_env(), info, msg);
         match res {
             Err(ContractError::InvalidDepositAmount {}) => {}
@@ -310,17 +310,18 @@ mod tests {
         }
     }
 
+    // Test transfer successfully
     #[test]
     fn test_transfer_successfully() {
         let mut deps = mock_dependencies();
         let msg = InstantiateMsg { allowed_denom: "tsy".to_string() };
-        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(1000, "tsy"));
+        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(1000, "tsy".to_string()));
         let _res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
 
-        let msg = ExecuteMsg::deposit{};
+        let msg = ExecuteMsg::Deposit{};
         let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-        let msg = ExecuteMsg::transfer {receiver: Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx1"), amount: Uint128::new(2),};
+        let msg = ExecuteMsg::Transfer {receiver: Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx1"), amount: Uint128::new(2),};
         let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &[]);
         let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(res.messages.len(), 0);
@@ -336,17 +337,196 @@ mod tests {
     fn test_transfer_error_fund_not_empty() {
         let mut deps = mock_dependencies();
         let msg = InstantiateMsg { allowed_denom: "tsy".to_string() };
-        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(1000, "tsy"));
+        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(1000, "tsy".to_string()));
         let _res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
 
-        let msg = ExecuteMsg::deposit{};
+        let msg = ExecuteMsg::Deposit{};
         let _res = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
 
-        let msg = ExecuteMsg::transfer {receiver: Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx1"), amount: Uint128::new(2),};
+        let msg = ExecuteMsg::Transfer {receiver: Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx1"), amount: Uint128::new(2),};
         let res = execute(deps.as_mut(), mock_env(), info, msg);
         match res {
             Err(ContractError::NoEmptyFunds {}) => {}
             _ => panic!("Must return Fund Not Empty error"),
+        }
+    }
+
+    // Test transfer error invalid address
+    #[test]
+    fn test_transfer_error_invalid_address() {
+        let mut deps = mock_dependencies();
+        let msg = InstantiateMsg { allowed_denom: "tsy".to_string() };
+        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(1000, "tsy".to_string()));
+        let _res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+
+        let msg = ExecuteMsg::Deposit{};
+        let _res = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+
+        let msg = ExecuteMsg::Transfer {receiver: Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx1"), amount: Uint128::new(2)};
+        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &[]);
+        let res = execute(deps.as_mut(), mock_env(), info, msg);
+        match res {
+            _ => panic!("Must return Invalid Address error"),
+        }
+    }
+
+    // Test transfer error 0
+    #[test]
+    fn test_transfer_error_0_transfer() {
+        let mut deps = mock_dependencies();
+        let msg = InstantiateMsg { allowed_denom: "tsy".to_string() };
+        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(1000, "tsy".to_string()));
+        let _res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+
+        let msg = ExecuteMsg::Deposit{};
+        let _res = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+
+        let msg = ExecuteMsg::Transfer {receiver: Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx1"), amount: Uint128::new(0)};
+        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &[]);
+        let res = execute(deps.as_mut(), mock_env(), info, msg);
+        match res {
+            Err(ContractError::InvalidTransferAmount {}) => {}
+            _ => panic!("Must return Invalid Transfer Amount error"),
+        }
+    }
+
+    // Test transfer error sender no deposit
+    #[test]
+    fn test_transfer_error_sender_no_deposit() {
+        let mut deps = mock_dependencies();
+        let msg = InstantiateMsg { allowed_denom: "tsy".to_string() };
+        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(1000, "tsy".to_string()));
+        let _res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+
+        let msg = ExecuteMsg::Deposit{};
+        let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+        let msg = ExecuteMsg::Transfer {receiver: Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx1"), amount: Uint128::new(2),};
+        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx1"), &[]);
+        let res = execute(deps.as_mut(), mock_env(), info, msg);
+        match res {
+            Err(ContractError::AddressHasNotDeposit {}) => {}
+            _ => panic!("Must return Address Has No Deposit error"),
+        }
+    }
+
+    // Test transfer error transfer exceed deposit
+    #[test]
+    fn test_transfer_error_transfer_exceed_deposit() {
+        let mut deps = mock_dependencies();
+        let msg = InstantiateMsg { allowed_denom: "tsy".to_string() };
+        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(1000, "tsy".to_string()));
+        let _res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+
+        let msg = ExecuteMsg::Deposit{};
+        let _res = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+
+        let msg = ExecuteMsg::Transfer {receiver: Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx1"), amount: Uint128::new(10000),};
+        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &[]);
+        let res = execute(deps.as_mut(), mock_env(), info, msg);
+        match res {
+            Err(ContractError::TransferFundsExceedsBalance {}) => {}
+            _ => panic!("Must return Transfer Exceed Balance error"),
+        }
+    }
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Test withdraw successfully
+    #[test]
+    fn test_withdraw_successfully() {
+        let mut deps = mock_dependencies();
+        let msg = InstantiateMsg { allowed_denom: "tsy".to_string() };
+        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(1000, "tsy".to_string()));
+        let _res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+
+        let msg = ExecuteMsg::Deposit{};
+        let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+        let msg = ExecuteMsg::Withdraw { amount: Uint128::new(2)};
+        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &[]);
+        let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+        assert_eq!(res.messages.len(), 0);
+
+        let res_q = query(deps.as_ref(), mock_env(), QueryMsg::GetDeposit { owner: Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0") }).unwrap();
+        let value: GetDepositResponse = from_json(&res_q).unwrap();
+        assert_eq!(value.deposit, Uint128::new(998));
+    }
+
+    // Test withdraw error fund not empty
+    #[test]
+    fn test_withdraw_error_fund_not_empty() {
+        let mut deps = mock_dependencies();
+        let msg = InstantiateMsg { allowed_denom: "tsy".to_string() };
+        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(1000, "tsy".to_string()));
+        let _res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+
+        let msg = ExecuteMsg::Deposit{};
+        let _res = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+
+        let msg = ExecuteMsg::Withdraw {amount: Uint128::new(2)};
+        let res = execute(deps.as_mut(), mock_env(), info, msg);
+        match res {
+            Err(ContractError::NoEmptyFunds {}) => {}
+            _ => panic!("Must return Fund Not Empty error"),
+        }
+    }
+
+    // Test withdraw error 0
+    #[test]
+    fn test_withdraw_error_0_withdraw() {
+        let mut deps = mock_dependencies();
+        let msg = InstantiateMsg { allowed_denom: "tsy".to_string() };
+        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(1000, "tsy".to_string()));
+        let _res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+
+        let msg = ExecuteMsg::Deposit{};
+        let _res = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+
+        let msg = ExecuteMsg::Withdraw {amount: Uint128::new(0)};
+        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &[]);
+        let res = execute(deps.as_mut(), mock_env(), info, msg);
+        match res {
+            Err(ContractError::InvalidWithdrawAmount {}) => {}
+            _ => panic!("Must return Invalid Withdraw Amount error"),
+        }
+    }
+
+    // Test withdraw error receiver no deposit
+    #[test]
+    fn test_withdraw_error_sender_no_deposit() {
+        let mut deps = mock_dependencies();
+        let msg = InstantiateMsg { allowed_denom: "tsy".to_string() };
+        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(1000, "tsy".to_string()));
+        let _res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+
+        let msg = ExecuteMsg::Deposit{};
+        let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+        let msg = ExecuteMsg::Withdraw {amount: Uint128::new(2)};
+        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx2"), &[]);
+        let res = execute(deps.as_mut(), mock_env(), info, msg);
+        match res {
+            Err(ContractError::AddressHasNotDeposit {}) => {}
+            _ => panic!("Must return Address Has No Deposit error"),
+        }
+    }
+
+    // Test withdraw error withdraw exceed deposit
+    #[test]
+    fn test_withdraw_error_withdraw_exceed_deposit() {
+        let mut deps = mock_dependencies();
+        let msg = InstantiateMsg { allowed_denom: "tsy".to_string() };
+        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(1000, "tsy".to_string()));
+        let _res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+
+        let msg = ExecuteMsg::Deposit{};
+        let _res = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+
+        let msg = ExecuteMsg::Withdraw {amount: Uint128::new(10000)};
+        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &[]);
+        let res = execute(deps.as_mut(), mock_env(), info, msg);
+        match res {
+            Err(ContractError::WithdrawFundsExceedsBalance {}) => {}
+            _ => panic!("Must return Withdraw Exceed Balance error"),
         }
     }
 }

@@ -9,11 +9,17 @@ pub enum ContractError {
     #[error("Unauthorized")]
     Unauthorized {},
 
-    #[error("Amount deposit must be greater than 0")]
+    #[error("Amount to deposit must be greater than 0")]
     InvalidDepositAmount(),
 
     #[error("Funds field should be empty")]
     NoEmptyFunds(),
+
+    #[error("Amount to transfer must be greater than 0")]
+    InvalidTransferAmount(),
+
+    #[error("Amount to withdraw must be greater than 0")]
+    InvalidWithdrawAmount(),
 
     #[error("Balance is lower than amount to transfer")]
     TransferFundsExceedsBalance(),
