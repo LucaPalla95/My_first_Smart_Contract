@@ -3,7 +3,7 @@ use cosmwasm_std::entry_point;
 use cosmwasm_std::{to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Addr, Uint128};
 use cw2::set_contract_version;
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, GetDepositResponse, InstantiateMsg, QueryMsg, GetAllDepositResponse, GetTotalDepositResponse};
+use crate::msg::{ExecuteMsg, GetDepositResponse, InstantiateMsg, QueryMsg, GetAllDepositResponse, GetTotalDepositResponse, GetStateResponse, GetStateResponse};
 use crate::state::{CONFIG, Config, BALANCES};
 
 // version info for migration info hh
@@ -168,8 +168,10 @@ pub fn query(
     _env: Env, 
     msg: QueryMsg) -> StdResult<Binary> {
     match msg {
+        QueryMsg::GetState {  } => to_json_binary(&query::state(deps)?),
         QueryMsg::GetDeposit {owner} => to_json_binary(&query::deposit(deps, owner)?),
         QueryMsg::GetAllDeposit {} => to_json_binary(&query::all_deposits(deps)?),
+        QueryMsg::GetTotalDeposit {} => to_json_binary(&query::totaldeposit(deps)?),
         }
     }
 
@@ -178,6 +180,12 @@ pub mod query {
     use cosmwasm_std::Order;
 
     use super::*;
+
+    pub fn state(
+        deps: Deps) -> StdResult<GetStateResponse> {
+        let config = CONFIG.load(deps.storage)?;
+        Ok(GetStateResponse {allowed_denom: config.allowed_denom})
+    }
 
     pub fn deposit(
         deps: Deps, 
@@ -225,23 +233,31 @@ mod tests {
     use cosmwasm_std::testing::{message_info, mock_dependencies, mock_env};
     use cosmwasm_std::{coins, from_json};
 
+
+    // Istantiate
     #[test]
     fn proper_initialization() {
         let mut deps = mock_dependencies();
-        let msg = InstantiateMsg { allowed_denom: "TSU".to_string() };
-        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglennn9"), &coins(1000, "earth"));
+        let msg = InstantiateMsg { allowed_denom: "tsy".to_string() };
+        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(1000, "tsy"));
 
         // we can just call .unwrap() to assert this was a success
         let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
+
+        // query the state
+        let res_q = query(deps.as_ref(), mock_env(), QueryMsg::GetState {}).unwrap();
+        let value: GetStateResponse = from_json(&res_q).unwrap();
+        assert_eq!("tsy", value.allowed_denom);
     }
 
+    // Test deposit successful
     #[test]
-    fn increment() {
+    fn test_deposit_successfully() {
         let mut deps = mock_dependencies();
 
-        let msg = InstantiateMsg { count: 17 };
-        let info = mock_info("creator", &coins(2, "token"));
+        let msg = InstantiateMsg { allowed_denom: "TSU".to_string() };
+        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(2, "token"));
         let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // beneficiary can release it

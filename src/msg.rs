@@ -17,13 +17,21 @@ pub enum ExecuteMsg {
 #[derive(QueryResponses)]
 pub enum QueryMsg {
     // GetCount returns the current count as a json-encoded number
+    #[returns(GetStateResponse)]
+    GetState {},
     #[returns(GetDepositResponse)]
     GetDeposit {owner: Addr},
     #[returns(GetAllDepositResponse)]
     GetAllDeposit {},
+    #[returns(GetTotalDepositResponse)]
+    GetTotalDeposit {},
 }
 
-// We define a custom struct for each query response
+// We define a custom struct for each query respons
+#[cw_serde]
+pub struct GetStateResponse {
+    pub allowed_denom: String,
+}
 #[cw_serde]
 pub struct GetDepositResponse {
     pub address: Addr,
