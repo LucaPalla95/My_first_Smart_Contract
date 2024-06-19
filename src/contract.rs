@@ -3,7 +3,7 @@ use cosmwasm_std::entry_point;
 use cosmwasm_std::{to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Addr, Uint128};
 use cw2::set_contract_version;
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, GetDepositResponse, InstantiateMsg, QueryMsg, GetAllDepositResponse, GetTotalDepositResponse, GetStateResponse, GetStateResponse};
+use crate::msg::{ExecuteMsg, GetDepositResponse, InstantiateMsg, QueryMsg, GetAllDepositResponse, GetTotalDepositResponse, GetStateResponse};
 use crate::state::{CONFIG, Config, BALANCES};
 
 // version info for migration info hh
@@ -88,7 +88,7 @@ pub mod execute {
 
         // check no funds are sent
         if !info.funds.is_empty() {
-            return Err(ContractError::EmptyFunds {});
+            return Err(ContractError::NoEmptyFunds {});
         }
 
         let receiver = deps.api.addr_validate(&receiver.to_string())?;
@@ -129,7 +129,7 @@ pub mod execute {
 
         // check no funds are sent
         if !info.funds.is_empty() {
-            return Err(ContractError::EmptyFunds {});
+            return Err(ContractError::NoEmptyFunds {});
         }
 
         // Upload confuguration and balance
@@ -257,16 +257,15 @@ mod tests {
         let mut deps = mock_dependencies();
         let msg = InstantiateMsg { allowed_denom: "tsy".to_string() };
         let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(1000, "tsy"));
-        let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        let _res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
 
         let msg = ExecuteMsg::deposit{};
-        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(2, "token"));
         let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(res.messages.len(), 0);
 
         // Check the balance in the storage
         let balance = BALANCES.load(&deps.storage, Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0")).unwrap();
-        assert_eq!(balance, Uint128::new(1002));
+        assert_eq!(balance, Uint128::new(1000));
     
         // Check if the correct event is emitted
         // let events = res.events;
@@ -281,7 +280,7 @@ mod tests {
 
     // Test deposit error
     #[test]
-    fn test_deposit_error() {
+    fn test_deposit_0_deposit_error() {
         let mut deps = mock_dependencies();
         let msg = InstantiateMsg { allowed_denom: "tsy".to_string() };
         let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(1000, "tsy"));
@@ -293,6 +292,61 @@ mod tests {
         match res {
             Err(ContractError::InvalidDepositAmount {}) => {}
             _ => panic!("Must return Invalid Deposit Amount error"),
+        }
+    }
+
+    #[test]
+    fn test_deposit_0_deposit_error_2() {
+        let mut deps = mock_dependencies();
+        let msg = InstantiateMsg { allowed_denom: "tsy".to_string() };
+        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(1000, "thi"));
+        let _res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+
+        let msg = ExecuteMsg::deposit{};
+        let res = execute(deps.as_mut(), mock_env(), info, msg);
+        match res {
+            Err(ContractError::InvalidDepositAmount {}) => {}
+            _ => panic!("Must return Invalid Deposit Amount error"),
+        }
+    }
+
+    #[test]
+    fn test_transfer_successfully() {
+        let mut deps = mock_dependencies();
+        let msg = InstantiateMsg { allowed_denom: "tsy".to_string() };
+        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(1000, "tsy"));
+        let _res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+
+        let msg = ExecuteMsg::deposit{};
+        let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+        let msg = ExecuteMsg::transfer {receiver: Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx1"), amount: Uint128::new(2),};
+        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &[]);
+        let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+        assert_eq!(res.messages.len(), 0);
+
+        let res_q = query(deps.as_ref(), mock_env(), QueryMsg::GetDeposit { owner: Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx1") }).unwrap();
+        let value: GetDepositResponse = from_json(&res_q).unwrap();
+        assert_eq!(value.deposit, Uint128::new(2));
+
+    }
+
+    // Test transfer error fund not empty
+    #[test]
+    fn test_transfer_error_fund_not_empty() {
+        let mut deps = mock_dependencies();
+        let msg = InstantiateMsg { allowed_denom: "tsy".to_string() };
+        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(1000, "tsy"));
+        let _res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+
+        let msg = ExecuteMsg::deposit{};
+        let _res = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
+
+        let msg = ExecuteMsg::transfer {receiver: Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx1"), amount: Uint128::new(2),};
+        let res = execute(deps.as_mut(), mock_env(), info, msg);
+        match res {
+            Err(ContractError::NoEmptyFunds {}) => {}
+            _ => panic!("Must return Fund Not Empty error"),
         }
     }
 }

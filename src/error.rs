@@ -12,8 +12,8 @@ pub enum ContractError {
     #[error("Amount deposit must be greater than 0")]
     InvalidDepositAmount(),
 
-    #[error("Funds field should not be empty")]
-    EmptyFunds(),
+    #[error("Funds field should be empty")]
+    NoEmptyFunds(),
 
     #[error("Balance is lower than amount to transfer")]
     TransferFundsExceedsBalance(),
