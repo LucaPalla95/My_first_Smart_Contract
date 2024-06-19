@@ -430,7 +430,6 @@ mod tests {
         }
     }
 
-
     // Test withdraw successfully
     #[test]
     fn test_withdraw_successfully() {
