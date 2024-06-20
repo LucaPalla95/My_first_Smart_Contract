@@ -9,7 +9,7 @@ pub struct InstantiateMsg {
 #[cw_serde]
 pub enum ExecuteMsg {
     Deposit {}, //We could insert the amount to check if it is consistent with the fund sent to the bank module of the blockchain
-    Transfer {amount: Uint128, receiver: Addr},
+    Transfer {amount: Uint128, receiver: String},
     Withdraw {amount: Uint128},
 }
 

@@ -83,7 +83,7 @@ pub mod execute {
         deps: DepsMut,
         info: MessageInfo, 
         amount: Uint128,
-        receiver: Addr,
+        receiver: String,
     ) -> Result<Response, ContractError> {
 
         // check no funds are sent
@@ -91,7 +91,7 @@ pub mod execute {
             return Err(ContractError::NoEmptyFunds {});
         }
 
-        let receiver = deps.api.addr_validate(&receiver.to_string())?;
+        let receiver = deps.api.addr_validate(&receiver)?;
 
         if amount.is_zero() {
             return Err(ContractError::InvalidTransferAmount{});
@@ -242,8 +242,9 @@ mod tests {
         let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &[]);
 
         // we can just call .unwrap() to assert this was a success
-        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
-        assert_eq!(0, res.messages.len());
+        let res = instantiate(deps.as_mut(), mock_env(), info, msg);
+        assert!(res.is_ok());
+        assert_eq!(0, res.unwrap().messages.len());
 
         // query the state
         let res_q = query(deps.as_ref(), mock_env(), QueryMsg::GetState {}).unwrap();
@@ -280,7 +281,7 @@ mod tests {
 
     // Test deposit error 0
     #[test]
-    fn test_deposit_0_deposit_error() {
+    fn test_deposit_error_0_amount() {
         let mut deps = mock_dependencies();
         let msg = InstantiateMsg { allowed_denom: "tsy".to_string() };
         let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(1000, "tsy".to_string()));
@@ -289,14 +290,17 @@ mod tests {
         let msg = ExecuteMsg::Deposit{};
         let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(0, "tsy".to_string()));
         let res = execute(deps.as_mut(), mock_env(), info, msg);
-        match res {
+        // assert!(res.is_err(),"Must return Invalid Deposit Amount error");
+        // let err = res.unwrap_err();
+        // assert_eq!(err, ContractError::InvalidDepositAmount{}, "Must return Invalid Deposit Amount error");
+        match res { 
             Err(ContractError::InvalidDepositAmount {}) => {}
             _ => panic!("Must return Invalid Deposit Amount error"),
         }
     }
     // Test deposit error 0 parte 2
     #[test]
-    fn test_deposit_0_deposit_error_2() {
+    fn test_deposit_error_0_amount_not_matching_allowed_denom() {
         let mut deps = mock_dependencies();
         let msg = InstantiateMsg { allowed_denom: "tsy".to_string() };
         let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(1000, "thi".to_string()));
@@ -315,21 +319,25 @@ mod tests {
     fn test_transfer_successfully() {
         let mut deps = mock_dependencies();
         let msg = InstantiateMsg { allowed_denom: "tsy".to_string() };
-        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &coins(1000, "tsy".to_string()));
+        let info = message_info(&Addr::unchecked("sender1"), &coins(1000, "tsy".to_string()));
         let _res = instantiate(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
 
         let msg = ExecuteMsg::Deposit{};
         let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-        let msg = ExecuteMsg::Transfer {receiver: Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx1"), amount: Uint128::new(2),};
-        let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &[]);
-        let res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
-        assert_eq!(res.messages.len(), 0);
+        let msg = ExecuteMsg::Transfer {receiver: "sender1".to_string(), amount: Uint128::new(2),};
+        let info = message_info(&Addr::unchecked("sender2"), &[]);
+        let res = execute(deps.as_mut(), mock_env(), info, msg);
+        let res_unwrapped = res.unwrap();
+        assert_eq!(res_unwrapped.messages.len(), 0);
 
-        let res_q = query(deps.as_ref(), mock_env(), QueryMsg::GetDeposit { owner: Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx1") }).unwrap();
+        let res_q = query(deps.as_ref(), mock_env(), QueryMsg::GetDeposit { owner: Addr::unchecked("sender2") }).unwrap();
         let value: GetDepositResponse = from_json(&res_q).unwrap();
         assert_eq!(value.deposit, Uint128::new(2));
 
+        let res_q = query(deps.as_ref(), mock_env(), QueryMsg::GetDeposit { owner: Addr::unchecked("sender1") }).unwrap();
+        let value: GetDepositResponse = from_json(&res_q).unwrap();
+        assert_eq!(value.deposit, Uint128::new(998));
     }
 
     // Test transfer error fund not empty
@@ -343,7 +351,7 @@ mod tests {
         let msg = ExecuteMsg::Deposit{};
         let _res = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
 
-        let msg = ExecuteMsg::Transfer {receiver: Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx1"), amount: Uint128::new(2),};
+        let msg = ExecuteMsg::Transfer {receiver: "cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx1".to_string(), amount: Uint128::new(2),};
         let res = execute(deps.as_mut(), mock_env(), info, msg);
         match res {
             Err(ContractError::NoEmptyFunds {}) => {}
@@ -362,7 +370,7 @@ mod tests {
         let msg = ExecuteMsg::Deposit{};
         let _res = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
 
-        let msg = ExecuteMsg::Transfer {receiver: Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx1"), amount: Uint128::new(2)};
+        let msg = ExecuteMsg::Transfer {receiver: "cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx1".to_string(), amount: Uint128::new(2)};
         let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &[]);
         let res = execute(deps.as_mut(), mock_env(), info, msg);
         match res {
@@ -381,7 +389,7 @@ mod tests {
         let msg = ExecuteMsg::Deposit{};
         let _res = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
 
-        let msg = ExecuteMsg::Transfer {receiver: Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx1"), amount: Uint128::new(0)};
+        let msg = ExecuteMsg::Transfer {receiver: "cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx1".to_string(), amount: Uint128::new(0)};
         let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &[]);
         let res = execute(deps.as_mut(), mock_env(), info, msg);
         match res {
@@ -401,7 +409,7 @@ mod tests {
         let msg = ExecuteMsg::Deposit{};
         let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-        let msg = ExecuteMsg::Transfer {receiver: Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx1"), amount: Uint128::new(2),};
+        let msg = ExecuteMsg::Transfer {receiver:"cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx1".to_string(), amount: Uint128::new(2),};
         let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx1"), &[]);
         let res = execute(deps.as_mut(), mock_env(), info, msg);
         match res {
@@ -421,7 +429,7 @@ mod tests {
         let msg = ExecuteMsg::Deposit{};
         let _res = execute(deps.as_mut(), mock_env(), info.clone(), msg).unwrap();
 
-        let msg = ExecuteMsg::Transfer {receiver: Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx1"), amount: Uint128::new(10000),};
+        let msg = ExecuteMsg::Transfer {receiver: "cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx1".to_string(), amount: Uint128::new(10000),};
         let info = message_info(&Addr::unchecked("cosmos1xv9tklw7d82sezh9ha4c6w7422k3halglxxxx0"), &[]);
         let res = execute(deps.as_mut(), mock_env(), info, msg);
         match res {
